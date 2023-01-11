@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from youtube_dl import YoutubeDL
+from yt_dlp import YoutubeDL
 from requests import get
 from misc import dlog, str_to_nums
 
