@@ -212,26 +212,12 @@ class music_cog(commands.Cog):
 
         # check for numbers separated by a comma
         res = str_to_nums(query)
-        if res is not None:
-            if res[0] == ',':
-                for i in res[1][::-1]:
-                    if len(self.music_queue) >= i:
-                        del self.music_queue[i-1]
-                    else:
-                        dlog("Can't remove #{} from queue of length {}".format(i, len(self.music_queue)))
-                        return
-            elif res[0] == '-':
-                if len(self.music_queue) >= res[1][1]:
-                    del self.music_queue[res[1][0]-1:res[1][1]]
+        if res is not False:
+            for i in res:
+                if len(self.music_queue) > i:
+                    del self.music_queue[i-1]
                 else:
-                    dlog("Can't remove #{} from queue of length {}".format(query, len(self.music_queue)))
-                    return
-            else:
-                if len(self.music_queue) > res[1]:
-                    del self.music_queue[res[1]]
-                else:
-                    dlog("Can't remove #{} from queue of length {}".format(query, len(self.music_queue)))
-                    return
+                    dlog("Can't remove #{} from queue of length {}".format(i, len(self.music_queue)))
 
             await ctx.send("Removing \"{}\" from the queue!".format(query))
             return
