@@ -1,9 +1,9 @@
 import discord
 from discord.ext import commands
-from yt_dlp import YoutubeDL
+from youtube_dl import YoutubeDL
 from requests import get
 from misc import dlog, str_to_nums
-
+from noise_normal import noise_normal
 
 # todo, i wanna make a volume normalizer
 # todo, so loud videos are made quieter and quiet videos are made louder
@@ -18,9 +18,11 @@ from misc import dlog, str_to_nums
 
 # todo, sometimes i a "HTTP error 403 Forbidden" error when trying to stream, need to detect it and try again
 
+
 class music_cog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.noise_normal = noise_normal()
 
         self.is_playing = False
         self.is_paused = False
@@ -32,7 +34,7 @@ class music_cog(commands.Cog):
 
         self.vc = None
 
-    def search_yt(self, item):
+    async def search_yt(self, item):
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
                 get(item)
@@ -41,7 +43,9 @@ class music_cog(commands.Cog):
                 info = ydl.extract_info(f"ytsearch:{item}", download=False)['entries'][0]
             else:
                 info = ydl.extract_info(item, download=False)
-        return {'source': info['formats'][0]['url'], 'title': info['title'], 'web_url': info['webpage_url']}
+
+        volume = await self.noise_normal.get_noise_normal(info['webpage_url'])
+        return {'source': info['formats'][0]['url'], 'title': info['title'], 'web_url': info['webpage_url'], 'volume': volume}
 
     def get_queue_list(self, max_size=10, url=False):
         message = []
@@ -68,8 +72,9 @@ class music_cog(commands.Cog):
             self.is_playing = True
 
             m_url = self.music_queue[0][0]['source']
+            volume = self.music_queue[0][0]['volume']
             self.music_queue.pop(0)
-            self.vc.play(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
+            self.vc.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), volume=volume), after=lambda e: self.play_next())
         else:
             self.is_playing = False
 
@@ -87,8 +92,9 @@ class music_cog(commands.Cog):
 
             self.is_playing = True
             m_url = self.music_queue[0][0]['source']
+            volume = self.music_queue[0][0]['volume']
             self.music_queue.pop(0)
-            self.vc.play(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
+            self.vc.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), volume=volume), after=lambda e: self.play_next())
         else:
             self.is_playing = False
 
@@ -106,7 +112,7 @@ class music_cog(commands.Cog):
             self.is_playing = True
             self.is_paused = False
         elif query != "":
-            song = self.search_yt(query)
+            song = await self.search_yt(query)
             # shows true if it fails?
             if type(song) is type(True):
                 await ctx.send("Could not add {} to queue\n".format(song['web_url']))
