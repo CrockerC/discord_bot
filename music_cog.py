@@ -159,7 +159,6 @@ class music_cog(commands.Cog):
         if self.vc is not None and self.vc:
             # doing this just stops the song and starts the next one in the queue
             self.vc.stop()
-            await self.play_music(ctx)
 
     @commands.command(name="queue", help="Displays all the songs in the queue")
     async def queue(self, ctx, *args):
