@@ -40,6 +40,7 @@ class music_cog(commands.Cog):
         else:
             self.YDL_OPTIONS["noplaylist"] = True
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
+            ydl.cache.remove()
             try:
                 get(item)
             except:
