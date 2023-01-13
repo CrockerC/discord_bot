@@ -4,8 +4,7 @@ import numpy as np
 import audio2numpy as a2n
 import os
 import asyncio
-
-# https://stackoverflow.com/questions/66388690/music-bot-volume-only-goes-down-but-not-up
+from pymongo import MongoClient
 
 
 class noise_normal:
@@ -17,6 +16,13 @@ class noise_normal:
             'format': 'worstaudio',  # audio quality does not have to be good
             "outtmpl": self.file_name,
         }
+        # using my home server to hold the db
+        self.db_client = MongoClient("mongodb://192.168.1.237:27017")
+        self.local_db = self.db_client.local  # select database
+        # if web_url is not indexed, index it for scaling
+        info = self.local_db.video_volume.index_information()
+        if 'web_url_1' not in info.keys():
+            self.local_db.video_volume.create_index("web_url")
 
     async def download_yt(self, url):
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -48,10 +54,17 @@ class noise_normal:
         return self.baseline/volume * self.baseline
 
     async def save_in_db(self, url, volume):
-        return False
+        result = self.local_db.video_volume.insert_one({'url': url, 'volume': volume})
+        if result.acknowledged:
+            dlog("Saved {} : {} in db".format(url, volume))
+        return result.acknowledged
 
     async def load_vol_from_db(self, url):
-        return False
+        result = self.local_db.video_volume.find_one({'url': url})
+        if result is None:
+            return False
+        dlog("Volume {} for {} found in db".format(result['volume'], url))
+        return result['volume']
 
     # takes url and gives back the volume adjustment
     async def get_noise_normal(self, url):

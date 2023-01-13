@@ -5,17 +5,7 @@ from requests import get
 from misc import dlog, str_to_nums
 from noise_normal import noise_normal
 
-# todo, i wanna make a volume normalizer
-# todo, so loud videos are made quieter and quiet videos are made louder
-# todo, it'll have to keep a file with the url and the volume
-# todo, YAY SQL
-# todo, it'll search for the thing in the file and if it is not found it'll spin off a thread to do it while it plays
-
 # todo, add voting
-
-# todo, move youtube search into its own class
-# todo, will be good for when i add noise normalization
-
 # todo, sometimes i a "HTTP error 403 Forbidden" error when trying to stream, need to detect it and try again
 
 
@@ -110,7 +100,7 @@ class music_cog(commands.Cog):
 
         # get current user's channel
         voice_channel = ctx.author.voice.channel
-        if voice_channel is None:  # todo, if the bot is already in a channel, just play it there, but only if its in the same server
+        if voice_channel is None:
             await ctx.send("Please connnect to a voice channel!")
         elif self.is_paused and query == "":
             self.vc.resume()
