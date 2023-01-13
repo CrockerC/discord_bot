@@ -34,7 +34,11 @@ class music_cog(commands.Cog):
 
         self.vc = None
 
-    async def search_yt(self, item):
+    async def search_yt(self, item, playlist=False):
+        if playlist:
+            self.YDL_OPTIONS["noplaylist"] = False
+        else:
+            self.YDL_OPTIONS["noplaylist"] = True
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
             try:
                 get(item)
