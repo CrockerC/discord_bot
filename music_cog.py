@@ -8,6 +8,9 @@ from noise_normal import noise_normal
 # todo, add voting
 # todo, sometimes i a "HTTP error 403 Forbidden" error when trying to stream, need to detect it and try again
 
+# todo, if the last user in the channel leaves, the bot will follow them to their next channel if bot has access
+# todo, if thats even possible
+
 
 class music_cog(commands.Cog):
     def __init__(self, bot):
@@ -26,7 +29,7 @@ class music_cog(commands.Cog):
 
     async def search_yt(self, item, playlist=False):
         if playlist:
-            self.YDL_OPTIONS["noplaylist"] = False
+            self.YDL_OPTIONS["noplaylist"] = False  # this doesnt seem to work
         else:
             self.YDL_OPTIONS["noplaylist"] = True
         with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -39,8 +42,17 @@ class music_cog(commands.Cog):
             else:
                 info = ydl.extract_info(item, download=False)
 
-        volume = await self.noise_normal.get_noise_normal(info['webpage_url'])
-        return {'source': info['formats'][0]['url'], 'title': info['title'], 'web_url': info['webpage_url'], 'volume': volume}
+        if 'entries' in info.keys():
+            songs = []
+            for entry in info['entries']:
+                volume = await self.noise_normal.get_noise_normal(entry['webpage_url'])
+                dict = {'source': entry['formats'][0]['url'], 'title': entry['title'], 'web_url': entry['webpage_url'], 'volume': volume}
+                songs.append(dict)
+            return songs
+
+        else:
+            volume = await self.noise_normal.get_noise_normal(info['webpage_url'])
+            return {'source': info['formats'][0]['url'], 'title': info['title'], 'web_url': info['webpage_url'], 'volume': volume}
 
     def get_queue_list(self, max_size=10, url=False):
         message = []
@@ -52,7 +64,7 @@ class music_cog(commands.Cog):
             else:
                 title = str(index + 1) + ". " + title
             message.append(title)
-            if index + 1 >= max_size:
+            if index + 1 > max_size:
                 title = "... and {} more".format(len(self.music_queue) - max_size)
                 message.append(title)
                 break
@@ -111,10 +123,12 @@ class music_cog(commands.Cog):
             # shows true if it fails?
             if type(song) is type(True):
                 await ctx.send("Could not add {} to queue\n".format(song['web_url']))
+            elif type(song) is list:
+                await ctx.send("Use \"[playlist\" command to play playlists")
+                return
             else:
                 await ctx.send("Added {} to queue\n".format(song['web_url']))
                 self.music_queue.append([song, voice_channel])
-                print(self.get_queue_list(100))
 
                 if self.is_playing is False and self.is_paused is False:
                     await self.play_music(ctx)
@@ -224,3 +238,29 @@ class music_cog(commands.Cog):
                 return
 
         await ctx.send("Could not find \"{}\" in the queue!".format(song['title']))
+
+    @commands.command(name="playlist", help="lets you link a playlist for queueing")
+    async def playlist(self, ctx, *args):
+        query = " ".join(args)
+        dlog("[command] [{}] play".format(ctx.author))
+
+        # get current user's channel
+        voice_channel = ctx.author.voice.channel
+        if voice_channel is None:
+            await ctx.send("Please connnect to a voice channel!")
+        elif query != "":
+            songs = await self.search_yt(query, True)
+            # shows true if it fails?
+            if type(songs) is type(True):
+                await ctx.send("Could not add {} to queue\n".format(query))
+            else:
+                await ctx.send("Added playlist {} to queue\n".format(query))
+                for song in songs:
+                    self.music_queue.append([song, voice_channel])
+
+                if self.is_playing is False and self.is_paused is False:
+                    await self.play_music(ctx)
+        elif len(self.music_queue) != 0:
+            await self.play_music(ctx)
+        else:
+            await ctx.send("Nothing to play")
