@@ -222,7 +222,7 @@ class music_cog(commands.Cog):
         res = str_to_nums(query)
         if res is not False:
             for i in res:
-                if len(self.music_queue) > i:
+                if len(self.music_queue) >= i:
                     del self.music_queue[i-1]
                 else:
                     dlog("Can't remove #{} from queue of length {}".format(i, len(self.music_queue)))
@@ -230,9 +230,9 @@ class music_cog(commands.Cog):
             await ctx.send("Removing \"{}\" from the queue!".format(query))
             return
 
-        song = self.search_yt(query)
+        song = await self.search_yt(query)
         for index, queued_song in enumerate(self.music_queue):
-            if song['title'] == self.music_queue[index][0]['title']:
+            if song['title'] == queued_song[0]['title']:
                 del self.music_queue[index]
                 await ctx.send("Removing \"{}\" from the queue!".format(song['title']))
                 return
