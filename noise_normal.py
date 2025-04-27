@@ -17,7 +17,7 @@ class noise_normal:
             "outtmpl": self.file_name,
         }
         # using my home server to hold the db
-        self.db_client = MongoClient("mongodb://192.168.1.237:27017")
+        self.db_client = MongoClient("mongodb://tower.local:27017")
         self.local_db = self.db_client.local  # select database
         # if web_url is not indexed, index it for scaling
         info = self.local_db.video_volume.index_information()
@@ -54,7 +54,7 @@ class noise_normal:
         return self.baseline/volume * self.baseline
 
     async def save_in_db(self, url, volume):
-        result = self.local_db.video_volume.insert_one({'url': url, 'volume': volume})
+        result = self.local_db.video_volume.insert_one({'url': url, 'volume': float(volume)})
         if result.acknowledged:
             dlog("Saved {} : {} in db".format(url, volume))
         return result.acknowledged

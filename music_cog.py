@@ -1,15 +1,15 @@
 import discord
 from discord.ext import commands
-from youtube_dl import YoutubeDL
+#from youtube_dl import YoutubeDL
+from yt_dlp import YoutubeDL
 from requests import get
 from misc import dlog, str_to_nums
 from noise_normal import noise_normal
 
 # todo, add voting
-# todo, sometimes i a "HTTP error 403 Forbidden" error when trying to stream, need to detect it and try again
 
-# todo, if the last user in the channel leaves, the bot will follow them to their next channel if bot has access
-# todo, if thats even possible
+# todo, add ability to move song to the top of queue, also put one at the top
+# todo, add ability to restart song
 
 
 class music_cog(commands.Cog):
@@ -21,6 +21,7 @@ class music_cog(commands.Cog):
         self.is_paused = False
 
         self.music_queue = []
+        self.current_song = None
         self.music_queue_backup = []  # for if you clear the queue but regret it
         self.YDL_OPTIONS = {"format": "bestaudio", "noplaylist": True}  # no playlist support for now
         self.FFMPEG_OPTIONS = {"before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5", "options": "-vn"}
@@ -46,13 +47,28 @@ class music_cog(commands.Cog):
             songs = []
             for entry in info['entries']:
                 volume = await self.noise_normal.get_noise_normal(entry['webpage_url'])
-                dict = {'source': entry['formats'][0]['url'], 'title': entry['title'], 'web_url': entry['webpage_url'], 'volume': volume}
-                songs.append(dict)
+                source = None
+                for item in entry['formats']:
+                    if 'audio only' in item['format'] and source is None:
+                        source = item['url']
+                    elif 'audio only' in item['format'] and source is not None:
+                        if 'high' in item['format']:
+                            source = item['url']
+                if source is not None:
+                    dict = {'source': source, 'title': entry['title'], 'web_url': entry['webpage_url'], 'volume': volume}
+                    songs.append(dict)
             return songs
 
         else:
             volume = await self.noise_normal.get_noise_normal(info['webpage_url'])
-            return {'source': info['formats'][0]['url'], 'title': info['title'], 'web_url': info['webpage_url'], 'volume': volume}
+            source = None
+            for item in info['formats']:
+                if 'audio only' in item['format'] and source is None:
+                    source = item['url']
+                elif 'audio only' in item['format'] and source is not None:
+                    if 'high' in item['format']:
+                        source = item['url']
+            return {'source': source, 'title': info['title'], 'web_url': info['webpage_url'], 'volume': volume}
 
     def get_queue_list(self, max_size=10, url=False):
         message = []
@@ -78,9 +94,9 @@ class music_cog(commands.Cog):
         if len(self.music_queue) > 0:
             self.is_playing = True
 
-            m_url = self.music_queue[0][0]['source']
-            volume = self.music_queue[0][0]['volume']
-            self.music_queue.pop(0)
+            self.current_song = self.music_queue.pop(0)
+            m_url = self.current_song[0]['source']
+            volume = self.current_song[0]['volume']
             self.vc.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), volume=volume), after=lambda e: self.play_next())
         else:
             self.is_playing = False
@@ -88,7 +104,9 @@ class music_cog(commands.Cog):
     async def play_music(self, ctx):
         if len(self.music_queue) > 0:
             if self.vc is None or not self.vc.is_connected():
+                print("connecting")
                 self.vc = await self.music_queue[0][1].connect()
+                print("connected")
 
                 if self.vc is None:
                     await ctx.send("Could not connect to the voice channel")
@@ -98,9 +116,9 @@ class music_cog(commands.Cog):
                 await self.vc.move_to(self.music_queue[0][1])
 
             self.is_playing = True
-            m_url = self.music_queue[0][0]['source']
-            volume = self.music_queue[0][0]['volume']
-            self.music_queue.pop(0)
+            self.current_song = self.music_queue.pop(0)
+            m_url = self.current_song[0]['source']
+            volume = self.current_song[0]['volume']
             self.vc.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), volume=volume), after=lambda e: self.play_next())
         else:
             self.is_playing = False
@@ -264,3 +282,9 @@ class music_cog(commands.Cog):
             await self.play_music(ctx)
         else:
             await ctx.send("Nothing to play")
+
+    @commands.command(name="restart", help="restarts current song")
+    async def restart(self, ctx, *args):
+        if self.is_playing:
+            self.music_queue = [self.current_song] + self.music_queue
+            self.vc.stop()
